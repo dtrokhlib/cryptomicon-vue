@@ -1,7 +1,8 @@
 <template>
   <div class="container mx-auto flex flex-col items-center bg-gray-100 p-4">
-    <!-- <div
-      class="fixed w-100 h-100 opacity-80 bg-purple-800 inset-0 z-50 flex items-center justify-center"
+    <div
+      v-if="!isLoaded"
+      class="fixed w-100 h-100 bg-purple-800 inset-0 z-50 flex items-center justify-center"
     >
       <svg
         class="animate-spin -ml-1 mr-3 h-12 w-12 text-white"
@@ -23,7 +24,7 @@
           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
         ></path>
       </svg>
-    </div> -->
+    </div>
     <div class="container">
       <section>
         <div class="flex">
@@ -35,6 +36,7 @@
               <input
                 v-model="ticker"
                 @keydown.enter="add"
+                @input="tickerIsExist = false"
                 type="text"
                 name="wallet"
                 id="wallet"
@@ -46,27 +48,15 @@
               class="flex bg-white shadow-md p-1 rounded-md shadow-md flex-wrap"
             >
               <span
+                v-for='(coins, index) in currentMatchCoins'
+                :key="index"
+                @click="add(coins.Symbol)"
                 class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
               >
-                BTC
-              </span>
-              <span
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-              >
-                DOGE
-              </span>
-              <span
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-              >
-                BCH
-              </span>
-              <span
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-              >
-                CHD
+                {{ coins.Symbol }}
               </span>
             </div>
-            <div class="text-sm text-red-600">Такой тикер уже добавлен</div>
+            <div v-if="tickerIsExist" class="text-sm text-red-600">Такой тикер уже добавлен</div>
           </div>
         </div>
         <button
@@ -177,15 +167,44 @@ export default {
 
   data() {
     return {
+      tickerIsExist: false,
       ticker: '',
       tickers: [],
+      coinsList: [],
       sel: null,
-      graph: []
+      graph: [],
+      isLoaded: false,
     }
   },
-
+  async created() {
+    const res = await fetch('https://min-api.cryptocompare.com/data/all/coinlist?summary=true');
+    const { Data } = await res.json();
+    Object.keys(Data).forEach(key => this.coinsList.push(Data[key]));
+  },
+  mounted() {
+    setTimeout(() => {
+      this.isLoaded = true;
+    }, 1000);
+  },  
+  computed: {
+    currentMatchCoins() {
+      return this.coinsList
+        .filter(coin => !this.tickers.find(t => t.name === coin.Symbol))
+        .filter(coin => coin.Symbol.startsWith(this.ticker || ''))
+        .slice(0, 3);
+    },
+  },
   methods: {
-    add() {
+
+    add(suggestion = '') {
+      if(suggestion) {
+        this.ticker = suggestion;
+      }
+      if(this.tickers.find(t => t.name === this.ticker)) {
+        this.tickerIsExist = true;
+        return;
+      }
+
       const newTicker = { 
         name: this.ticker,
         price: '-',
