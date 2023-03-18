@@ -188,7 +188,7 @@
 </template>
 
 <script>
-import { getCoinList, getCoinPrice, getSubscribedCoinsPrice } from '@/api';
+import { getCoinList, getCoinPrice, getSubscribedCoinsPrice, subscribeToTicker, unsubscribeFromTicker } from '@/api';
 const REFRESH_DATA_INTERVAL = 5000;
 
 export default {
@@ -212,7 +212,7 @@ export default {
   async created() {
     this.assignQueryParams();
     this.assignTickersFromStorage();
-    setInterval(this.updateTickers, REFRESH_DATA_INTERVAL);
+    setInterval(getSubscribedCoinsPrice, REFRESH_DATA_INTERVAL);
   },
 
   async mounted() {
@@ -246,7 +246,7 @@ export default {
       const maxValue = Math.max(...this.graph);
       const minValue = Math.min(...this.graph);
 
-      if(maxValue == minValue) {
+      if(maxValue === minValue) {
         return this.graph.map(() => 50);
       }
       return this.graph.map(
@@ -288,16 +288,12 @@ export default {
   },
 
   methods: {
-    async updateTickers() {
-      if (!this.tickers.length) {
-        return;
-      }
-
-      const exchangeData = await getSubscribedCoinsPrice(this.tickers.map((t) => t.name));
-      console.log('exchangeData', exchangeData);
-      this.tickers.forEach(ticker => {
-        ticker.price = exchangeData[ticker.name.toUpperCase()];
-      });
+    updateTicker(tickerName, price) {
+      this.tickers
+        .filter(t => t.name === tickerName)
+        .forEach(t => {
+          t.price = price;
+        })
     },
 
     async add() {
@@ -319,6 +315,7 @@ export default {
       };
       this.tickers = [...this.tickers, currentTicker];
       this.clearTicker();
+      subscribeToTicker(currentTicker.name, (newPrice) => this.updateTicker(currentTicker.name, newPrice));
     },
 
     async addFromSuggestion(suggestion) {
@@ -339,6 +336,7 @@ export default {
       if (this.selectedTicker === tickerToRemove) {
         this.selectedTicker = null;
       }
+      unsubscribeFromTicker(tickerToRemove.name);
     },
 
     select(ticker) {
@@ -359,6 +357,9 @@ export default {
       const storageData = localStorage.getItem('cryptonomicon-list');
       if (storageData) {
         this.tickers = JSON.parse(storageData);
+        this.tickers.forEach(ticker => {
+          subscribeToTicker(ticker.name, (newPrice) => this.updateTicker(ticker.name, newPrice));
+        })
       }
     },
 
