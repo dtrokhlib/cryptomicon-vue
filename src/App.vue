@@ -188,8 +188,7 @@
 </template>
 
 <script>
-import { getCoinList, getCoinPrice, getSubscribedCoinsPrice, subscribeToTicker, unsubscribeFromTicker } from '@/api';
-const REFRESH_DATA_INTERVAL = 5000;
+import { subscribeToTicker, unsubscribeFromTicker, getCoinList } from '@/api';
 
 export default {
   name: 'App',
@@ -205,14 +204,12 @@ export default {
       isLoaded: false,
       page: 1,
       filter: "",
-      subscriptions: new Map(),
     };
   },
 
   async created() {
     this.assignQueryParams();
     this.assignTickersFromStorage();
-    setInterval(getSubscribedCoinsPrice, REFRESH_DATA_INTERVAL);
   },
 
   async mounted() {
@@ -303,15 +300,9 @@ export default {
         return;
       }
 
-      const price = await getCoinPrice(this.ticker);
-      if (!price) {
-        this.clearTicker();
-        return;
-      }
-
       const currentTicker = {
         name: this.ticker,
-        price
+        price: '-'
       };
       this.tickers = [...this.tickers, currentTicker];
       this.clearTicker();
