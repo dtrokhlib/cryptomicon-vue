@@ -48,7 +48,7 @@
               class="flex bg-white shadow-md p-1 rounded-md shadow-md flex-wrap"
             >
               <span
-                v-for='(coins, index) in currentMatchCoins'
+                v-for="(coins, index) in currentMatchCoins"
                 :key="index"
                 @click="add(coins.Symbol)"
                 class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
@@ -56,7 +56,9 @@
                 {{ coins.Symbol }}
               </span>
             </div>
-            <div v-if="tickerIsExist" class="text-sm text-red-600">Такой тикер уже добавлен</div>
+            <div v-if="tickerIsExist" class="text-sm text-red-600">
+              Такой тикер уже добавлен
+            </div>
           </div>
         </div>
         <button
@@ -81,59 +83,83 @@
         </button>
       </section>
       <template v-if="tickers.length">
-      <hr class="w-full border-t border-gray-600 my-4" />
-      <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
-        <div
-          v-for='(t, index) in tickers'
-          :key="index"
-          @click="select(t)"
-          :class="{
-            'border-4': sel === t
-          }"
-          class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
-        >
-          <div class="px-4 py-5 sm:p-6 text-center">
-            <dt class="text-sm font-medium text-gray-500 truncate">
-              {{ t.name }} - USD
-            </dt>
-            <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ t.price }}</dd>
-          </div>
-          <div class="w-full border-t border-gray-200"></div>
+        <div>
           <button
-            @click.stop="handleDelete(index)"
-            class="flex items-center justify-center font-medium w-full bg-gray-100 px-4 py-4 sm:px-6 text-md text-gray-500 hover:text-gray-600 hover:bg-gray-200 hover:opacity-20 transition-all focus:outline-none"
+            v-if="page > 1"
+            @click="page--"
+            class="my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
           >
-            <svg
-              class="h-5 w-5"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="#718096"
-              aria-hidden="true"
-            >
-              <path
-                fill-rule="evenodd"
-                d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                clip-rule="evenodd"
-              ></path></svg
-            >Удалить
+            Prev
           </button>
+          <span class='m-2 border-black border-size-2 border-spacing-2'>{{ page }}</span>
+          <button
+            v-if="hasNextPage"
+            @click="page++"
+            class="my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+          >
+            Next
+          </button>
+          <div> Filter: <input v-model="filter"> </div>
         </div>
-      </dl>
-      <hr class="w-full border-t border-gray-600 my-4" />
+        <hr class="w-full border-t border-gray-600 my-4" />
+        <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
+          <div
+            v-for="(t, index) in paginatedTickers"
+            :key="index"
+            @click="select(t)"
+            :class="{
+              'border-4': selectedTicker === t,
+            }"
+            class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
+          >
+            <div class="px-4 py-5 sm:p-6 text-center">
+              <dt class="text-sm font-medium text-gray-500 truncate">
+                {{ t.name }} - USD
+              </dt>
+              <dd class="mt-1 text-3xl font-semibold text-gray-900">
+                {{ t.price }}
+              </dd>
+            </div>
+            <div class="w-full border-t border-gray-200"></div>
+            <button
+              @click.stop="handleDelete(t)"
+              class="flex items-center justify-center font-medium w-full bg-gray-100 px-4 py-4 sm:px-6 text-md text-gray-500 hover:text-gray-600 hover:bg-gray-200 hover:opacity-20 transition-all focus:outline-none"
+            >
+              <svg
+                class="h-5 w-5"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="#718096"
+                aria-hidden="true"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                  clip-rule="evenodd"
+                ></path></svg
+              >Удалить
+            </button>
+          </div>
+        </dl>
+        <hr class="w-full border-t border-gray-600 my-4" />
       </template>
-      <section v-if="sel" class="relative">
+      <section v-if="selectedTicker" class="relative">
         <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
-          {{ sel.name }} - USD
+          {{ selectedTicker.name }} - USD
         </h3>
         <div class="flex items-end border-gray-600 border-b border-l h-64">
-          <div 
-            v-for="(bar, index) in normalizeGraph()"
-            :key="index" 
+          <div
+            v-for="(bar, index) in normalizedGraph"
+            :key="index"
             :style="{ height: `${bar}%` }"
             class="bg-purple-800 border w-10 h-24"
           ></div>
         </div>
-        <button @click="sel = null" type="button" class="absolute top-0 right-0">
+        <button
+          @click="selectedTicker = null"
+          type="button"
+          class="absolute top-0 right-0"
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -171,70 +197,165 @@ export default {
       ticker: '',
       tickers: [],
       coinsList: [],
-      sel: null,
+      selectedTicker: null,
       graph: [],
       isLoaded: false,
-    }
+      page: 1,
+      filter: "",
+    };
   },
   async created() {
-    const res = await fetch('https://min-api.cryptocompare.com/data/all/coinlist?summary=true');
+    const windowData = Object.fromEntries(new URL(window.location).searchParams.entries());
+    if (windowData.filter) {
+      this.filter = windowData.filter;
+    }
+    if (windowData.page) {
+      this.page = windowData.page;
+    }
+
+    const storageData = localStorage.getItem('cryptonomicon-list');
+    if (storageData) {
+      this.tickers = JSON.parse(storageData);
+      this.tickers.forEach((ticker) => {
+        this.subscribeToUpdates(ticker.name);
+      });
+    }
+
+    const res = await fetch(
+      'https://min-api.cryptocompare.com/data/all/coinlist?summary=true'
+    );
     const { Data } = await res.json();
-    Object.keys(Data).forEach(key => this.coinsList.push(Data[key]));
+    Object.keys(Data).forEach((key) => this.coinsList.push(Data[key]));
   },
+
   mounted() {
     setTimeout(() => {
       this.isLoaded = true;
     }, 1000);
-  },  
+  },
+
   computed: {
     currentMatchCoins() {
       return this.coinsList
-        .filter(coin => !this.tickers.find(t => t.name === coin.Symbol))
-        .filter(coin => coin.Symbol.startsWith(this.ticker || ''))
+        .filter((coin) => !this.tickers.find((t) => t.name === coin.Symbol))
+        .filter((coin) => coin.Symbol.startsWith(this.ticker || ''))
         .slice(0, 3);
     },
-  },
-  methods: {
 
+    hasNextPage() {
+      return this.tickers.length > this.page * 6;
+    },
+
+    filteredTickers() {
+      return this.tickers.filter((t) => t.name.includes(this.filter))
+    },
+
+    paginatedTickers() {
+      const start = (this.page - 1) * 6;
+      const end = (this.page * 6);
+      return this.filteredTickers.slice(start, end);
+    },
+
+    normalizedGraph() {
+      const maxValue = Math.max(...this.graph);
+      const minValue = Math.min(...this.graph);
+
+      if(maxValue == minValue) {
+        return this.graph.map(() => 50);
+      }
+      return this.graph.map(
+        (price) => (5 + (price - minValue) * 95) / (maxValue - minValue)
+      );
+    }, 
+
+    pageStateOptions() {
+      return {
+        filter: this.filter,
+        page: this.page,
+      }
+    }
+  },
+
+  watch: {
+    paginatedTickers() {
+      if (this.paginatedTickers.length === 0 && this.page > 1) {
+        this.page -= 1;
+      }
+    },
+
+    pageStateOptions(value) {
+      history.pushState(null, document.title, `${window.history.pathname}?filter=${value.filter}&page=${value.page}`)
+    },
+
+    filter() {
+      this.page = 1;
+    },
+
+    page() {
+      history.pushState(null, document.title, `${window.history.pathname}?filter=${this.filter}&page=${this.page}`)
+    },
+
+    selectedTicker() {
+      this.graph = [];
+    },
+
+    tickers() {
+      localStorage.setItem('cryptonomicon-list', JSON.stringify(this.tickers));
+    },
+
+
+  },
+
+  methods: {
     add(suggestion = '') {
-      if(suggestion) {
+      if (suggestion) {
         this.ticker = suggestion;
       }
-      if(this.tickers.find(t => t.name === this.ticker)) {
+      if (this.tickers.find((t) => t.name === this.ticker)) {
         this.tickerIsExist = true;
         return;
       }
 
-      const newTicker = { 
+      const currentTicker = {
         name: this.ticker,
         price: '-',
-      }
-      setInterval(async () => {
-        const f = await fetch(`https://min-api.cryptocompare.com/data/price?fsym=${newTicker.name}&tsyms=USD&api_key=976e862f8ec3cbb0054f8f8da3a6ed26f0078c92474004333593c3d4aace5891`);
+      };
+      this.tickers = [...this.tickers, currentTicker];
+
+      this.subscribeToUpdates(currentTicker.name)
+    },
+
+    subscribeToUpdates(tickerName) {
+      const interval = setInterval(async () => {
+        const f = await fetch(
+          `https://min-api.cryptocompare.com/data/price?fsym=${tickerName}&tsyms=USD&api_key=976e862f8ec3cbb0054f8f8da3a6ed26f0078c92474004333593c3d4aace5891`
+        );
         const data = await f.json();
-        this.tickers.find(t => t.name == newTicker.name).price = data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
-        newTicker.price = data.USD;
-        if(this.sel?.name === newTicker.name) {
-          this.graph.push(data.USD)
+        if (data.Response === 'Error') {
+          this.handleDelete(this.tickers.find((t) => t.name == tickerName));
+          clearInterval(interval);
+          return;
         }
-      }, 3000)
-      this.tickers.push(newTicker);
+        this.tickers.find((t) => t.name == tickerName).price =
+          data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
+        if (this.selectedTicker?.name === tickerName) {
+          this.graph.push(data.USD);
+        }
+      }, 5000);
       this.ticker = '';
     },
-    handleDelete(index) {
-      const filteredTickers = this.tickers.filter((t, i) => i !== index);
-      this.tickers = filteredTickers;
+
+    handleDelete(tickerToRemove) {
+      this.tickers = this.tickers.filter((t) => t !== tickerToRemove);
+      if(this.selectedTicker === tickerToRemove) {
+        this.selectedTicker = null;
+      }
     },
-    normalizeGraph() {
-      const maxValue = Math.max(...this.graph);
-      const minValue = Math.min(...this.graph);
-      return this.graph.map(price => (5 + (price - minValue) * 95) / (maxValue - minValue));
-    },
+
     select(ticker) {
-      this.sel = ticker;
-      this.graph = []
-    }
-  }
+      this.selectedTicker = ticker;
+    },
+  },
 };
 </script>
 
