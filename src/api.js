@@ -8,7 +8,7 @@ const socket = new WebSocket(`wss://streamer.cryptocompare.com/v2?api_key=${API_
 
 socket.addEventListener('message', (e) => {
    const { TYPE: type, FROMSYMBOL: coin, PRICE: newPrice } = JSON.parse(e.data);
-   if(type !== AGGREGATE_INDEX) {
+   if(type !== AGGREGATE_INDEX || !newPrice) {
       return;
    }
 
