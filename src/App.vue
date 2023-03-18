@@ -188,7 +188,7 @@
 </template>
 
 <script>
-import { getCoinList, getCoinCurrentPrice } from '@/api';
+import { getCoinList, getCoinPrice, getSubscribedCoinsPrice } from '@/api';
 const REFRESH_DATA_INTERVAL = 5000;
 
 export default {
@@ -208,9 +208,11 @@ export default {
       subscriptions: new Map(),
     };
   },
+
   async created() {
     this.assignQueryParams();
     this.assignTickersFromStorage();
+    setInterval(this.updateTickers, REFRESH_DATA_INTERVAL);
   },
 
   async mounted() {
@@ -257,7 +259,7 @@ export default {
         filter: this.filter,
         page: this.page,
       }
-    }
+    },
   },
 
   watch: {
@@ -286,6 +288,18 @@ export default {
   },
 
   methods: {
+    async updateTickers() {
+      if (!this.tickers.length) {
+        return;
+      }
+
+      const exchangeData = await getSubscribedCoinsPrice(this.tickers.map((t) => t.name));
+      console.log('exchangeData', exchangeData);
+      this.tickers.forEach(ticker => {
+        ticker.price = exchangeData[ticker.name.toUpperCase()];
+      });
+    },
+
     async add() {
       if (this.getTicker(this.ticker)) {
         this.tickerIsExist = true;
@@ -293,7 +307,7 @@ export default {
         return;
       }
 
-      const price = await getCoinCurrentPrice(this.ticker);
+      const price = await getCoinPrice(this.ticker);
       if (!price) {
         this.clearTicker();
         return;
@@ -304,7 +318,6 @@ export default {
         price
       };
       this.tickers = [...this.tickers, currentTicker];
-      this.subscribeToUpdates(currentTicker.name);
       this.clearTicker();
     },
 
@@ -321,28 +334,9 @@ export default {
       this.ticker = '';
     },
 
-    subscribeToUpdates(tickerName) {
-      const interval = setInterval(async () => {
-        const currentTicker = this.getTicker(tickerName)
-        currentTicker.price = await getCoinCurrentPrice(tickerName)
-        if (this.selectedTicker?.name === tickerName) {
-          this.graph.push(currentTicker.price);
-        }
-      }, REFRESH_DATA_INTERVAL);
-      this.subscriptions.set(tickerName, interval);
-    },
-
-    removeSubscriptions(name) {
-      if (this.subscriptions.has(name)) {
-        clearInterval(this.subscriptions.get(name));
-        this.subscriptions.delete(name);
-      }
-    },
-
     handleDelete(tickerToRemove) {
-      this.removeSubscriptions(tickerToRemove.name);
       this.tickers = this.tickers.filter((t) => t !== tickerToRemove);
-      if(this.selectedTicker === tickerToRemove) {
+      if (this.selectedTicker === tickerToRemove) {
         this.selectedTicker = null;
       }
     },
@@ -365,9 +359,6 @@ export default {
       const storageData = localStorage.getItem('cryptonomicon-list');
       if (storageData) {
         this.tickers = JSON.parse(storageData);
-        this.tickers.forEach((ticker) => {
-          this.subscribeToUpdates(ticker.name);
-        });
       }
     },
 
