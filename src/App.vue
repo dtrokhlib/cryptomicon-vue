@@ -50,10 +50,10 @@
               <span
                 v-for="(coins, index) in currentMatchCoins"
                 :key="index"
-                @click="addFromSuggestion(coins.Symbol)"
+                @click="addFromSuggestion(coins)"
                 class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
               >
-                {{ coins.Symbol }}
+                {{ coins }}
               </span>
             </div>
             <div v-if="tickerIsExist" class="text-sm text-red-600">
@@ -112,7 +112,10 @@
             }"
             class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
           >
-            <div class="px-4 py-5 sm:p-6 text-center">
+            <div 
+              class="px-4 py-5 sm:p-6 text-center"
+              :class="{ 'bg-red-100': t.status === 'invalid' }"
+            >
               <dt class="text-sm font-medium text-gray-500 truncate">
                 {{ t.name }} - USD
               </dt>
@@ -188,7 +191,7 @@
 </template>
 
 <script>
-import { subscribeToTicker, unsubscribeFromTicker, getCoinList } from '@/api';
+import { cryptoApi } from '@/services/crypto-api';
 
 export default {
   name: 'App',
@@ -213,15 +216,15 @@ export default {
   },
 
   async mounted() {
-    this.coinsList = await getCoinList();
+    this.coinsList = await cryptoApi.getCoinList();
     this.isLoaded = true;
   },
 
   computed: {
     currentMatchCoins() {
       return this.coinsList
-        .filter((coin) => !this.tickers.find((t) => t.name === coin.Symbol))
-        .filter((coin) => coin.Symbol.startsWith(this.ticker || ''))
+        .filter((coin) => !this.tickers.find((t) => t.name === coin))
+        .filter((coin) => coin.startsWith(this.ticker || ''))
         .slice(0, 3);
     },
 
@@ -309,7 +312,7 @@ export default {
       };
       this.tickers = [...this.tickers, currentTicker];
       this.clearTicker();
-      subscribeToTicker(currentTicker.name, (newPrice) => this.updateTicker(currentTicker.name, newPrice));
+      cryptoApi.addTicker(currentTicker.name, (newPrice) => this.updateTicker(currentTicker.name, newPrice), () => this.makeTickerInvalid(currentTicker.name));
     },
 
     async addFromSuggestion(suggestion) {
@@ -330,7 +333,7 @@ export default {
       if (this.selectedTicker === tickerToRemove) {
         this.selectedTicker = null;
       }
-      unsubscribeFromTicker(tickerToRemove.name);
+      cryptoApi.removeTicker(tickerToRemove.name);
     },
 
     select(ticker) {
@@ -347,12 +350,20 @@ export default {
       }
     },
 
+    makeTickerInvalid(tickerName) {
+      this.tickers
+        .filter(t => t.name === tickerName)
+        .forEach(t => {
+          t.status = 'invalid';
+        })
+    },
+
     assignTickersFromStorage() {
       const storageData = localStorage.getItem('cryptonomicon-list');
       if (storageData) {
         this.tickers = JSON.parse(storageData);
         this.tickers.forEach(ticker => {
-          subscribeToTicker(ticker.name, (newPrice) => this.updateTicker(ticker.name, newPrice));
+          cryptoApi.addTicker(ticker.name, (newPrice) => this.updateTicker(ticker.name, newPrice), () => this.makeTickerInvalid(ticker.name));
         })
       }
     },
