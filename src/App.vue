@@ -282,7 +282,6 @@ export default {
     },
 
     tickers() {
-      console.log(this.tickers);
       localStorage.setItem('cryptonomicon-list', JSON.stringify(this.tickers));
     },
 

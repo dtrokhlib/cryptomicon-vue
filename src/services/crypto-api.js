@@ -34,7 +34,6 @@ export class CryptoApi {
   }
 
   updateTickerPrice(fromSymbol, toSymbol, rawPrice) {
-    console.log(fromSymbol, toSymbol);
     if (toSymbol === 'USD') {
       return this.directExchangeUpdate(fromSymbol, rawPrice)
     }
@@ -49,7 +48,6 @@ export class CryptoApi {
   }
 
   doubleConversionExchangeUpdate(fromSymbol, toSymbol, rawPrice, retry = 3) {
-    console.log(this.coinPriceToUsd);
     if(!this.coinPriceToUsd.has(toSymbol)) {
       retry && setTimeout(() => this.doubleConversionExchangeUpdate(fromSymbol, toSymbol, rawPrice, retry--), 5000);
       return;
