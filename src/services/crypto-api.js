@@ -1,45 +1,116 @@
-import { SocketConnector } from "./socket-connection";
+const TickerStatuses = {
+  INVALID: 'invalid',
+  CONVERTED: 'converted',
+};
 
 const routes = {
-  coinlist: 'data/all/coinlist'
+  coinList: 'data/all/coinlist',
+  pairsList: 'data/v2/cccagg/pairs'
 }
 
 export class CryptoApi {
   tickerHandlers = new Map();
-  tickerMetadata = new Map();
+  invalidExchanges = new Map();
+  pairsList = {};
+  coinPriceToUsd = new Map();
 
   constructor(
     apiData,
-    socketConnector,
+    workerConnector,
   ) {
     this.apiData = apiData;
-    this.socketConnector = socketConnector;
+    this.workerConnector = workerConnector;
     this.initEventListener();
+
   }
 
-  initEventListener() {
-    this.socketConnector.addListener('message', (e) => {
-      const { TYPE, PRICE, FROMSYMBOL, PARAMETER, MESSAGE } = JSON.parse(e.data);
-      if (TYPE === this.apiData.AGGREGATE_INDEX) {
-        const handlers = this.tickerHandlers.get(FROMSYMBOL)?.callbacks || [];
-        const price = getPrice(PRICE);
-        handlers.forEach(fn => fn(price));
-      }
-
-      if(TYPE === '500' && MESSAGE === 'INVALID_SUB') {
-        const params = PARAMETER.split('~');
-        const tickerName = params[params.length - 2];
-        this.tickerHandlers.get(tickerName)?.makeInvalid(); 
-        // this.removeTicker(params[params.length - 2]);
-      }
-    });
+  async initEventListener() {
+    await this.retrievePairs();
+    this.workerConnector.onmessage = (e) => {
+      const { TYPE, PRICE, FROMSYMBOL, TOSYMBOL, PARAMETER, MESSAGE } = JSON.parse(e.data);
+      TYPE === this.apiData.AGGREGATE_INDEX && this.updateTickerPrice(FROMSYMBOL, TOSYMBOL, PRICE);
+      TYPE === '500' && MESSAGE === 'INVALID_SUB' && this.validatePossibleCoinTransfers(PARAMETER);
+    }
   }
 
-  addTicker(ticker, cb, makeInvalid) {
+  updateTickerPrice(fromSymbol, toSymbol, rawPrice) {
+    console.log(fromSymbol, toSymbol);
+    if (toSymbol === 'USD') {
+      return this.directExchangeUpdate(fromSymbol, rawPrice)
+    }
+    return this.doubleConversionExchangeUpdate(fromSymbol, toSymbol, rawPrice)
+  }
+
+  directExchangeUpdate(fromSymbol, rawPrice) {
+    const handlers = this.tickerHandlers.get(fromSymbol)?.callbacks || [];
+    const price = this.getPrice(rawPrice);
+    handlers.forEach(fn => fn(price));
+    price && this.addCoinPriceMemoryStore(fromSymbol, rawPrice);
+  }
+
+  doubleConversionExchangeUpdate(fromSymbol, toSymbol, rawPrice, retry = 3) {
+    console.log(this.coinPriceToUsd);
+    if(!this.coinPriceToUsd.has(toSymbol)) {
+      retry && setTimeout(() => this.doubleConversionExchangeUpdate(fromSymbol, toSymbol, rawPrice, retry--), 5000);
+      return;
+    }
+    const coinForExchanges = this.coinPriceToUsd.get(toSymbol);
+    const handlers = this.tickerHandlers.get(fromSymbol)?.callbacks || [];
+    const price = this.getPrice(rawPrice * coinForExchanges * 1);
+
+    price && this.tickerHandlers.get(fromSymbol)?.changeTickerStatus(TickerStatuses.CONVERTED);
+    handlers.forEach(fn => fn(price));
+  }
+
+  validatePossibleCoinTransfers(parameters) {
+    const params = parameters.split('~');
+    const [convertToCurrency, tickerName] = params.reverse();
+    if(tickerName && convertToCurrency) {
+      this.handleInvalidCoinTransfer(tickerName, convertToCurrency)
+    }
+  }
+
+  addCoinPriceMemoryStore(tickerName, price) {
+    this.coinPriceToUsd.set(tickerName, price);
+  }
+
+  handleInvalidCoinTransfer(tickerName, convertToCurrency) {
+    const currencyForDoubleConversion = this.getPossibleExchangeCurrency(tickerName);
+    
+    if (currencyForDoubleConversion) {
+      this.subscribeToUpdates(tickerName, currencyForDoubleConversion);
+      this.subscribeToUpdates(currencyForDoubleConversion);
+    }
+
+
+    this.tickerHandlers.get(tickerName)?.changeTickerStatus(TickerStatuses.INVALID);
+    if (convertToCurrency === 'USD') {
+      this.subscribeToUpdates(tickerName, 'BTC');
+    }
+  }
+
+  getPossibleExchangeCurrency(ticker) {
+    const exchanges = this.pairsList[ticker].tsyms;
+    const exchangesList = Object.keys(exchanges);
+
+    if(!exchangesList?.length) {
+      return null;
+    }
+
+    for (let currency of exchangesList) {
+      if(this.pairsList[currency]?.tsyms?.USD) {
+        return currency;
+      }
+    }
+
+    return null;
+  }
+
+  addTicker(ticker, cb, changeTickerStatus) {
     const subscribers = this.tickerHandlers.get(ticker)?.callbacks || [];
     this.tickerHandlers.set(ticker, { 
       callbacks: [...subscribers, cb], 
-      makeInvalid: makeInvalid,
+      changeTickerStatus,
     });
     this.subscribeToUpdates(ticker);
   }
@@ -49,45 +120,55 @@ export class CryptoApi {
     this.unsubscribeFromUpdates(ticker);
   }
 
-  subscribeToUpdates(ticker) {
-    this.socketConnector.sendMessage({
+  subscribeToUpdates(ticker, coinCurrency = this.apiData.COIN_CURRENCY) {
+    this.workerConnector.postMessage(JSON.stringify({
       action: "SubAdd",
-      subs: [`${this.apiData.AGGREGATE_INDEX}~CCCAGG~${ticker}~${this.apiData.COIN_CURRENCY}`],
-    });
+      subs: [`${this.apiData.AGGREGATE_INDEX}~CCCAGG~${ticker}~${coinCurrency}`],
+    }));
   }
 
   unsubscribeFromUpdates(ticker) {
-    this.socketConnector.sendMessage({
+    this.workerConnector.postMessage(JSON.stringify({
       action: "SubRemove",
       subs: [`${this.apiData.AGGREGATE_INDEX}~CCCAGG~${ticker}~${this.apiData.COIN_CURRENCY}`],
-    });
+    }));
+  }
+
+  async retrievePairs() {
+    const url = `${this.apiData.COIN_API_URL}/${routes.pairsList}?api_key=${this.apiData.API_KEY}`;
+    const res = await fetch(url);
+    const json = await res.json();
+
+    if (json?.Data) {
+      this.pairsList = json.Data?.pairs || [];
+    }
   }
 
   async getCoinList() {
-    const url = `${this.apiData.COIN_API_URL}/${routes.coinlist}?api_key=${this.apiData.API_KEY}`;
+    const url = `${this.apiData.COIN_API_URL}/${routes.coinList}?api_key=${this.apiData.API_KEY}`;
     const res = await fetch(url);
     const json = await res.json();
     return  Object.keys(json.Data);
   }
 
+  getPrice = (price) => {
+    if (!price) {
+      return  '-';
+    }
+    return price > 1 ? price.toFixed(2) : price.toPrecision(2);
+  }
 }
 
 const apiData = {
   COIN_API_URL: 'https://min-api.cryptocompare.com',
-  COIN_SOCKET_URL: 'wss://streamer.cryptocompare.com/v2?api_key=${API_KEY}',
   API_KEY: '976e862f8ec3cbb0054f8f8da3a6ed26f0078c92474004333593c3d4aace5891',
   COIN_CURRENCY: 'USD',
   SECONDARY_CURRENCY: 'BTC',
   AGGREGATE_INDEX: '5',
-}
+};
 
-const connectionString = apiData.COIN_SOCKET_URL.replace('${API_KEY}', apiData.API_KEY);
-const socketConnector = new SocketConnector(connectionString);
-export const cryptoApi = new CryptoApi(apiData, socketConnector);
 
-export const getPrice = (price) => {
-  if (!price) {
-    return  '-';
-  }
-  return price > 1 ? price.toFixed(2) : price.toPrecision(2);
-}
+const workerConnector = new SharedWorker('worker-socket-connector.js');
+workerConnector.port.start();
+
+export const cryptoApi = new CryptoApi(apiData, workerConnector.port);

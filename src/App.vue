@@ -117,7 +117,7 @@
               :class="{ 'bg-red-100': t.status === 'invalid' }"
             >
               <dt class="text-sm font-medium text-gray-500 truncate">
-                {{ t.name }} - USD
+                {{ t.name }}-USD
               </dt>
               <dd class="mt-1 text-3xl font-semibold text-gray-900">
                 {{ t.price }}
@@ -282,6 +282,7 @@ export default {
     },
 
     tickers() {
+      console.log(this.tickers);
       localStorage.setItem('cryptonomicon-list', JSON.stringify(this.tickers));
     },
 
@@ -295,6 +296,7 @@ export default {
           t.price = price;
           if (t === this.selectedTicker) {
             this.graph.push(price);
+            this.graph.length > 30 && this.graph.shift();
           }
         })
     },
@@ -350,11 +352,11 @@ export default {
       }
     },
 
-    makeTickerInvalid(tickerName) {
+    changeTickerStatus(tickerName, status) {
       this.tickers
         .filter(t => t.name === tickerName)
         .forEach(t => {
-          t.status = 'invalid';
+          t.status = status;
         })
     },
 
@@ -363,7 +365,11 @@ export default {
       if (storageData) {
         this.tickers = JSON.parse(storageData);
         this.tickers.forEach(ticker => {
-          cryptoApi.addTicker(ticker.name, (newPrice) => this.updateTicker(ticker.name, newPrice), () => this.makeTickerInvalid(ticker.name));
+          cryptoApi.addTicker(
+              ticker.name, 
+              (newPrice) => this.updateTicker(ticker.name, newPrice), 
+              (status) => this.changeTickerStatus(ticker.name, status),
+            );
         })
       }
     },
