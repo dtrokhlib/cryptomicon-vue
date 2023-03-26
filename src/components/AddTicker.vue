@@ -27,7 +27,7 @@
           </span>
         </div>
         <div v-if="0" class="text-sm text-red-600">
-          Такой тикер уже добавлен
+          Such ticker was already added
         </div>
       </div>
     </div>
